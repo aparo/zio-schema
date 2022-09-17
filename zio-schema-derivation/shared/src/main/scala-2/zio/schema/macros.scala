@@ -2,8 +2,9 @@ package zio.schema
 
 import scala.annotation.nowarn
 import scala.reflect.macros.whitebox
-
 import zio.Chunk
+
+import scala.collection.immutable.ListMap
 
 object DeriveSchema {
   import scala.language.experimental.macros
@@ -249,6 +250,30 @@ object DeriveSchema {
               })
           }.getOrElse(Nil)
 
+        // default values
+        @nowarn
+        val defaultValues: ListMap[String, Option[Tree]] = {
+            tpe.typeSymbol.companion.typeSignature.member(TermName("apply")).asTerm.alternatives.find(_.isSynthetic) match {
+              case None => ListMap()
+              case Some(syntatic) =>
+                ListMap(
+                  syntatic.asMethod.paramLists.flatten.zipWithIndex.map {
+                    case (field, i) =>
+                      val defaultValue= {
+                        val method = TermName(s"apply$$default$$${i + 1}")
+                        tpe.typeSymbol.companion.typeSignature.member(method) match {
+                          case NoSymbol => None
+                          case _ => Some(q"${tpe.typeSymbol.companion}.$method")
+                        }
+                      }
+
+                      ( field.name.toTermName.decodedName.toString.trim, defaultValue)
+                  }: _*
+                )
+            }
+        }
+
+
         if (arity > 22) {
           val fields = fieldTypes.zip(fieldAnnotations).map {
             case (termSymbol, annotations) =>
@@ -258,7 +283,12 @@ object DeriveSchema {
                 currentFrame +: stack
               )
               val fieldLabel = termSymbol.name.toString.trim
-              q"zio.schema.Schema.Field.apply($fieldLabel,$fieldSchema,zio.Chunk.apply[Any](..$annotations))"
+              defaultValues.get(fieldLabel) match {
+                case Some(defaultValue) =>
+                  q"zio.schema.Schema.Field.apply($fieldLabel,$fieldSchema,zio.Chunk.apply[Any](..$annotations), defaultValue=$defaultValue)"
+                case None =>
+                  q"zio.schema.Schema.Field.apply($fieldLabel,$fieldSchema,zio.Chunk.apply[Any](..$annotations))"
+              }
           }
           val fromMap = {
             val casts = fieldTypes.map { termSymbol =>
@@ -320,11 +350,19 @@ object DeriveSchema {
               )
               val fieldArg   = if (fieldTypes.size > 1) TermName(s"field${idx + 1}") else TermName("field")
               val fieldLabel = termSymbol.name.toString.trim
+              defaultValues.get(fieldLabel) match {
+                case Some(defaultValue) =>
+                  if (annotations.nonEmpty)
+                    q"""$fieldArg = zio.schema.Schema.Field.apply(label = $fieldLabel, schema = $fieldSchema, annotations = zio.Chunk.apply[Any](..$annotations), validation = $validation, defaultValue = $defaultValue)"""
+                  else
+                    q"""$fieldArg = zio.schema.Schema.Field.apply(label = $fieldLabel, schema = $fieldSchema, validation = $validation, defaultValue = $defaultValue)"""
+                case None =>
+                  if (annotations.nonEmpty)
+                    q"""$fieldArg = zio.schema.Schema.Field.apply(label = $fieldLabel, schema = $fieldSchema, annotations = zio.Chunk.apply[Any](..$annotations), validation = $validation)"""
+                  else
+                    q"""$fieldArg = zio.schema.Schema.Field.apply(label = $fieldLabel, schema = $fieldSchema, validation = $validation)"""
+              }
 
-              if (annotations.nonEmpty)
-                q"""$fieldArg = zio.schema.Schema.Field.apply(label = $fieldLabel, schema = $fieldSchema, annotations = zio.Chunk.apply[Any](..$annotations), validation = $validation)"""
-              else
-                q"""$fieldArg = zio.schema.Schema.Field.apply(label = $fieldLabel, schema = $fieldSchema, validation = $validation)"""
           }
 
           val constructArgs = fieldTypes.zipWithIndex.map {

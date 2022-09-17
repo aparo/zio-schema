@@ -276,7 +276,7 @@ object JsonCodec extends Codec {
             pad(indent_, out)
             var first = true
             structure.foreach {
-              case Schema.Field(k, a, _, _) =>
+              case Schema.Field(k, a, _, _, _) =>
                 val enc = schemaEncoder(a.asInstanceOf[Schema[Any]])
                 if (first)
                   first = false
@@ -481,7 +481,7 @@ object JsonCodec extends Codec {
             while ({
               val field = Lexer.string(trace, in).toString
               structure.find(_.label == field) match {
-                case Some(Schema.Field(label, schema, _, _)) =>
+                case Some(Schema.Field(label, schema, _, _, _)) =>
                   val trace_ = JsonError.ObjectAccess(label) :: trace
                   Lexer.char(trace_, in, ':')
                   val value = schemaDecoder(schema).unsafeDecode(trace_, in)
@@ -513,7 +513,7 @@ object JsonCodec extends Codec {
         pad(indent_, out)
         var first = true
         fields.foreach {
-          case (Schema.Field(key, schema, _, _), ext) =>
+          case (Schema.Field(key, schema, _, _, _), ext) =>
             val enc = Encoder.schemaEncoder(schema.asInstanceOf[Schema[Any]])
             if (!enc.isNothing(ext(a))) {
               if (first)

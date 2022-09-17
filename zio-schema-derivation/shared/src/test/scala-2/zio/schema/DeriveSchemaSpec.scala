@@ -39,7 +39,7 @@ object DeriveSchemaSpec extends ZIOSpecDefault {
   sealed case class UserId(id: String)
 
   @annotation3
-  sealed case class User(name: String, @annotation1("foo") @annotation2("bar") @annotation3 @annotation4(0) id: UserId)
+  sealed case class User(name: String="John", @annotation1("foo") @annotation2("bar") @annotation3 @annotation4(0) id: UserId)
 
   object User {
     implicit lazy val schema: Schema.CaseClass2[String, UserId, User] = DeriveSchema.gen[User]
@@ -243,6 +243,7 @@ object DeriveSchemaSpec extends ZIOSpecDefault {
         assert(derived)(hasSameSchema(expected))
       },
       test("correctly derives case class") {
+        assert(Schema[User].asInstanceOf[zio.schema.Schema.Record[User]].structure.head.defaultValue.asInstanceOf[Option[String]])(equalTo(Some("John"))) &&
         assert(Schema[User].toString)(not(containsString("null")) && not(equalTo("$Lazy$")))
       },
       test("correctly derives case class with arity > 22") {

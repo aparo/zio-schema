@@ -279,9 +279,10 @@ object Schema extends SchemaEquality {
     label: String,
     schema: Schema[A],
     annotations: Chunk[Any] = Chunk.empty,
-    validation: Validation[A] = Validation.succeed[A]
+    validation: Validation[A] = Validation.succeed[A],
+    defaultValue: Option[A] = None
   ) {
-    override def toString: String = s"Field($label,$schema)"
+    override def toString: String = s"Field($label,$schema,$defaultValue)"
   }
 
   sealed trait Record[R] extends Schema[R] {

@@ -835,7 +835,7 @@ object ThriftCodec extends Codec {
         def addFields(values: ListMap[Short, Any], index: Int): Result[Array[Any]] =
           if (index >= fields.size) Right(buffer)
           else {
-            val Schema.Field(label, schema, _, _) = fields(index)
+            val Schema.Field(label, schema, _, _, _) = fields(index)
             val rawValue                          = values.get((index + 1).toShort)
             rawValue match {
               case Some(value) =>
